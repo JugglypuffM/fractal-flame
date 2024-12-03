@@ -6,3 +6,12 @@ lazy val samples = project
     scalaVersion := Versions.scala3,
     libraryDependencies ++= Seq(scalaTest, scalastic)
   )
+
+name := "fractal-flame"
+
+version := "1.0"
+
+scalaVersion := "3.3.3"
+
+scalaVersion := Versions.scala3
+libraryDependencies ++= Seq(scalaTest, scalastic)
