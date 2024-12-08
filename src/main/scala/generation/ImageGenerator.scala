@@ -1,13 +1,13 @@
 package generation
 
 import cats.effect.Async
+import cats.effect.implicits.concurrentParTraverseOps
 import cats.effect.std.Random
 import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxEitherId, toFlatMapOps, toFunctorOps}
 import domain.console.Config
 import domain.image.Image
 import domain.image.Image.*
 import domain.transforms.Point
-import fs2.Stream
 
 class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
   private def randomBoundedPoint: F[Point] =
@@ -43,13 +43,11 @@ class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
     for {
       image <- Image.empty(config.width, config.height)
 
-      _ <- Stream
+      randomPoints <- List
         .range(0, config.samples)
-        .covary[F]
-        .parEvalMapUnordered(config.threads)(_ => randomBoundedPoint)
-        .parEvalMapUnordered(config.threads)(processIteration(_, 0, image))
-        .compile
-        .drain
+        .map(_ => randomBoundedPoint)
+        .parTraverseN(config.threads)(identity)
+      _ <- randomPoints.parTraverseN(config.threads)(point => processIteration(point, 0, image))
     } yield image
 
 }

@@ -1,11 +1,11 @@
 package generation
 
+import cats.effect.implicits.concurrentParTraverseOps
 import cats.effect.{Async, Ref}
-import cats.implicits.{toFlatMapOps, toFunctorOps}
+import cats.implicits.toFunctorOps
 import domain.console.Config
 import domain.image.Image.Image
 import domain.image.{Image, Pixel}
-import fs2.Stream
 
 class ImageCorrector[F[_]: Async](config: Config) {
   private def correctPixel(pixelRef: Ref[F, Pixel]): F[Unit] =
@@ -14,10 +14,5 @@ class ImageCorrector[F[_]: Async](config: Config) {
     )
 
   def logGammaCorrect(image: Image[F]): F[Unit] =
-    Stream
-      .emits(image)
-      .flatMap(Stream.emits)
-      .parEvalMapUnordered(config.threads)(correctPixel)
-      .compile
-      .drain
+    image.parTraverseN(config.threads)(_.parTraverseN(config.threads)(correctPixel)).as(())
 }

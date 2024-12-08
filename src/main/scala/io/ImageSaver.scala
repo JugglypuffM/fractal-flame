@@ -1,6 +1,7 @@
 package io
 
 import cats.effect.{Async, Ref}
+import cats.effect.implicits.concurrentParTraverseOps
 import cats.implicits.{toFlatMapOps, toFunctorOps}
 import domain.console.Config
 import domain.image.Image.Image
@@ -38,14 +39,7 @@ class ImageSaver[F[_]: Async](config: Config) {
     )
 
     for {
-      _ <- Stream
-        .emits(image)
-        .flatMap(Stream.emits)
-        .parEvalMapUnordered(config.threads)(pixel =>
-          convertPixel(pixel, buffer)
-        )
-        .compile
-        .drain
+      _ <- image.parTraverseN(config.threads)(_.parTraverseN(config.threads)(convertPixel(_, buffer))).as(())
 
       _ <- Files[F].createDirectories(
         config.filePath.parent.getOrElse(Path("."))
