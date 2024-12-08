@@ -16,7 +16,7 @@ object ConfigReader {
     import builder.*
 
     val processors = Runtime.getRuntime.availableProcessors()
-    
+
     def parseTransform(str: String): Transform =
       val parameterArray = str.split(",").map(_.toDouble)
       val variation = parameterArray(9).toInt match
@@ -86,6 +86,11 @@ object ConfigReader {
         .action((x, c) => c.copy(yMax = x))
         .text(
           "Upper boundary for y component of start point"
+        ),
+      opt[Double]("gamma")
+        .action((x, c) => c.copy(gamma = x))
+        .text(
+          "Parameter for log-gamma correction"
         ),
       opt[String]("transform")
         .required()

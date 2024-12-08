@@ -13,6 +13,7 @@ case class Config(
     xMax: Double = 1.777,
     yMin: Double = -1,
     yMax: Double = 1,
+    gamma: Double = 2.2,
     transforms: List[Transform] = List.empty,
     filePath: Path = Path("./image.png")
 )
