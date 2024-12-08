@@ -1,10 +1,10 @@
 package domain.console
 
-import domain.image.Color
-import domain.transforms.{Affine, Transform, Variation}
+import domain.transforms.Transform
 import fs2.io.file.Path
 
 case class Config(
+    samples: Int = 10,
     iterations: Int = 1000000,
     threads: Int = 1,
     width: Int = 1920,

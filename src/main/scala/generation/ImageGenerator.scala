@@ -1,10 +1,11 @@
 package generation
 
+import cats.effect.Async
 import cats.effect.std.Random
-import cats.effect.{Async, Ref}
-import cats.implicits.{toFlatMapOps, toFunctorOps}
+import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxEitherId, toFlatMapOps, toFunctorOps}
 import domain.console.Config
 import domain.image.Image
+import domain.image.Image.*
 import domain.transforms.Point
 import fs2.Stream
 
@@ -15,30 +16,40 @@ class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
       y <- random.betweenDouble(config.yMin, config.yMax)
     } yield Point(x, y)
 
-  def processIteration(ref: Ref[F, Image]): F[Unit] =
-    for {
-      point <- randomBoundedPoint
-      transform <- random.elementOf(config.transforms)
-      newPoint <- transform(point)
-      x =
-        config.width - (((config.xMax - newPoint.x) / (config.xMax - config.xMin)) * config.width).toInt - 1
-      y =
-        config.height - (((config.yMax - newPoint.y) / (config.yMax - config.yMin)) * config.height).toInt - 1
-      _ <- ref.update(_.updatePixel(x, y, transform.affine.color))
-    } yield ()
+  def processIteration(
+      point: Point,
+      currentIteration: Int,
+      image: Image[F]
+  ): F[Unit] = {
+    Async[F].tailRecM((point, currentIteration)) {
+      case (currentPoint, iteration) =>
+        if (iteration >= config.iterations) {
+          ().asRight[(Point, Int)].pure[F]
+        } else {
+          for {
+            transform <- random.elementOf(config.transforms)
+            newPoint <- transform(currentPoint)
+            x =
+              config.width - (((config.xMax - newPoint.x) / (config.xMax - config.xMin)) * config.width).toInt - 1
+            y =
+              config.height - (((config.yMax - newPoint.y) / (config.yMax - config.yMin)) * config.height).toInt - 1
+            _ <- image.updatePixel(x, y, transform.affine.color)
+          } yield (newPoint, iteration + 1).asLeft[Unit]
+        }
+    }
+  }
 
-  def generateImage: F[Image] =
+  def generateImage: F[Image[F]] =
     for {
-      imageRef <- Ref.of[F, Image](Image.empty(config.width, config.height))
+      image <- Image.empty(config.width, config.height)
 
       _ <- Stream
-        .range(0, config.iterations)
+        .range(0, config.samples)
         .covary[F]
-        .parEvalMapUnordered(config.threads)(_ => processIteration(imageRef))
+        .parEvalMapUnordered(config.threads)(_ => randomBoundedPoint)
+        .parEvalMapUnordered(config.threads)(processIteration(_, 0, image))
         .compile
         .drain
-
-      image <- imageRef.get
     } yield image
 
 }

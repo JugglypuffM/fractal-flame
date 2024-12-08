@@ -9,8 +9,8 @@ object Main extends IOApp {
       config <- ConfigReader.readConfig[IO](args)
       random <- Random.scalaUtilRandom[IO]
       image <- ImageGenerator[IO](config, random).generateImage
-      correctedImage <- ImageCorrector[IO](config).logGammaCorrect(image)
-      _ <- ImageSaver[IO](config).saveImage(correctedImage)
+      _ <- ImageCorrector[IO](config).logGammaCorrect(image)
+      _ <- ImageSaver[IO](config).saveImage(image)
     } yield ExitCode.Success
 
 }

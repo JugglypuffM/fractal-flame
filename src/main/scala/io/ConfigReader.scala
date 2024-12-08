@@ -60,12 +60,15 @@ object ConfigReader {
 
     OParser.sequence(
       programName("fractal-flame"),
+      opt[Int]("samples")
+        .action((x, c) => c.copy(iterations = x))
+        .text("Amount of samples"),
       opt[Int]("iterations")
         .action((x, c) => c.copy(iterations = x))
-        .text("amount of plotting iterations"),
+        .text("Amount of plotting iterations"),
       opt[Int]("threads")
         .validate(validateThreads)
-        .action((x, c) => c)
+        .action((x, c) => c.copy(threads = x))
         .text(""),
       opt[Int]("width")
         .action((x, c) => c.copy(width = x))
