@@ -28,7 +28,11 @@ object ConfigReader {
 
       Transform(
         Affine(
-          Color(parameterArray(0).toInt, parameterArray(1).toInt, parameterArray(2).toInt),
+          Color(
+            parameterArray(0).toInt,
+            parameterArray(1).toInt,
+            parameterArray(2).toInt
+          ),
           parameterArray(3),
           parameterArray(4),
           parameterArray(5),
@@ -50,7 +54,9 @@ object ConfigReader {
       Try(Path(str)).map(_ => success).getOrElse(failure("Invalid file path"))
 
     def validateTransform(str: String): Either[String, Unit] =
-      Try(parseTransform(str)).map(_ => success).getOrElse(failure("Invalid transform format"))
+      Try(parseTransform(str))
+        .map(_ => success)
+        .getOrElse(failure("Invalid transform format"))
 
     OParser.sequence(
       programName("fractal-flame"),
@@ -95,9 +101,10 @@ object ConfigReader {
       opt[String]("transform")
         .required()
         .unbounded()
-        .action((x, c) => c.copy(transforms = parseTransform(x)::c.transforms))
-        .text(
-          """
+        .action((x, c) =>
+          c.copy(transforms = parseTransform(x) :: c.transforms)
+        )
+        .text("""
             |Array of the form r,g,b,a,b,c,d,e,f,variationNumber, where variation number =
             |1 - Sinusoidal
             |2 - Spherical

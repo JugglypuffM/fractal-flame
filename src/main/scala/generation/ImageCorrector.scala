@@ -12,16 +12,18 @@ class ImageCorrector[F[_]: Async](config: Config) {
     ref.update(_.updatePixel(pixel.x, pixel.y, newColor))
 
   def logGammaCorrect(image: Image): F[Image] =
-    for{
+    for {
       imageRef <- Ref.of[F, Image](image)
 
       _ <- Stream
         .emits(image.grid)
         .flatMap(Stream.emits(_))
-        .parEvalMapUnordered(config.threads)(pixel => correctPixel(pixel, imageRef))
+        .parEvalMapUnordered(config.threads)(pixel =>
+          correctPixel(pixel, imageRef)
+        )
         .compile
         .drain
-      
+
       correctedImage <- imageRef.get
     } yield correctedImage
 

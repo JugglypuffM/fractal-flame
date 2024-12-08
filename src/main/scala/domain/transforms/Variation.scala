@@ -6,7 +6,7 @@ sealed trait Variation {
   def apply(point: Point): Point
 }
 
-object Variation{
+object Variation {
   case object Linear extends Variation {
     override def apply(point: Point): Point = point
   }

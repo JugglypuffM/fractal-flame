@@ -6,7 +6,9 @@ case class Image(grid: Vector[Vector[Pixel]]) {
       Image(grid)
     else if (grid(y)(x).hits == 0)
       val pixel = grid(y)(x)
-      Image(grid.updated(y, grid(y).updated(x, pixel.copy(color = color, hits = 1))))
+      Image(
+        grid.updated(y, grid(y).updated(x, pixel.copy(color = color, hits = 1)))
+      )
     else
       val pixel = grid(y)(x)
       val newRed = (pixel.color.red + color.red) / 2
@@ -14,7 +16,11 @@ case class Image(grid: Vector[Vector[Pixel]]) {
       val newBlue = (pixel.color.blue + color.blue) / 2
       val newColor = Color(newRed, newGreen, newBlue)
       Image(
-        grid.updated(y, grid(y).updated(x, pixel.copy(color = newColor, hits = pixel.hits + 1)))
+        grid.updated(
+          y,
+          grid(y)
+            .updated(x, pixel.copy(color = newColor, hits = pixel.hits + 1))
+        )
       )
   }
 }
