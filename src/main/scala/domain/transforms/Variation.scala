@@ -1,12 +1,12 @@
 package domain.transforms
 
-import domain.Point
-
 import scala.math.*
 
 sealed trait Variation {
   def apply(point: Point): Point
+}
 
+object Variation{
   case object Linear extends Variation {
     override def apply(point: Point): Point = point
   }
@@ -38,7 +38,8 @@ sealed trait Variation {
       val r = sqrt(point.x * point.x + point.y * point.y)
       Point(
         ((point.x + point.y) * (point.x - point.y)) / r,
-        (2 * point.x * point.y)/r
+        (2 * point.x * point.y) / r
       )
   }
+
 }
