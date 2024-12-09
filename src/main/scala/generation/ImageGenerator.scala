@@ -5,8 +5,8 @@ import cats.effect.implicits.concurrentParTraverseOps
 import cats.effect.std.Random
 import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxEitherId, toFlatMapOps, toFunctorOps}
 import domain.console.Config
-import domain.image.Image
 import domain.image.Image.*
+import domain.image.{Image, Pixel}
 import domain.transforms.Point
 
 class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
@@ -16,26 +16,28 @@ class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
       y <- random.betweenDouble(config.yMin, config.yMax)
     } yield Point(x, y)
 
+  private def projectPoint(point: Point): F[Pixel] =
+    val x =
+      config.width - (((config.xMax - point.x) / (config.xMax - config.xMin)) * config.width).toInt - 1
+    val y =
+      config.height - (((config.yMax - point.y) / (config.yMax - config.yMin)) * config.height).toInt - 1
+    Pixel(x, y).pure[F]
+
   def processIteration(
       point: Point,
       currentIteration: Int,
       image: Image[F]
   ): F[Unit] = {
-    Async[F].tailRecM((point, currentIteration)) {
-      case (currentPoint, iteration) =>
-        if (iteration >= config.iterations) {
-          ().asRight[(Point, Int)].pure[F]
-        } else {
-          for {
-            transform <- random.elementOf(config.transforms)
-            newPoint <- transform(currentPoint)
-            x =
-              config.width - (((config.xMax - newPoint.x) / (config.xMax - config.xMin)) * config.width).toInt - 1
-            y =
-              config.height - (((config.yMax - newPoint.y) / (config.yMax - config.yMin)) * config.height).toInt - 1
-            _ <- image.updatePixel(x, y, transform.affine.color)
-          } yield (newPoint, iteration + 1).asLeft[Unit]
-        }
+    if (currentIteration >= config.iterations) {
+      Async[F].unit
+    } else {
+      for {
+        transform <- random.elementOf(config.transforms)
+        newPoint <- transform(point)
+        pixel <- projectPoint(newPoint)
+        _ <- image.updatePixel(pixel.x, pixel.y, transform.affine.color)
+        _ <- processIteration(newPoint, currentIteration + 1, image)
+      } yield ()
     }
   }
 
@@ -47,7 +49,9 @@ class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
         .range(0, config.samples)
         .map(_ => randomBoundedPoint)
         .parTraverseN(config.threads)(identity)
-      _ <- randomPoints.parTraverseN(config.threads)(point => processIteration(point, 0, image))
+      _ <- randomPoints.parTraverseN(config.threads)(point =>
+        processIteration(point, 0, image)
+      )
     } yield image
 
 }
