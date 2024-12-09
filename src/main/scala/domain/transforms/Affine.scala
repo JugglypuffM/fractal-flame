@@ -20,7 +20,7 @@ case class Affine(
   }
 }
 
-object Affine{
+object Affine {
   def generateRandomAffine: Affine =
     Affine(
       Color(

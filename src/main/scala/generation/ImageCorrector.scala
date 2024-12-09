@@ -8,12 +8,19 @@ import domain.image.Image
 import domain.image.Image.Image
 
 class ImageCorrector[F[_]: Async](config: Config) {
-  private def correctPixels(image: Image[F], maxHits: Int): F[Vector[Vector[Unit]]] =
+  private def correctPixels(
+      image: Image[F],
+      maxHits: Int
+  ): F[Vector[Vector[Unit]]] =
     image
       .parTraverseN(config.threads)(
-        _.parTraverseN(config.threads)(_.update(pixel =>
-          pixel.copy(color = pixel.color.correct(pixel.hits, maxHits, config.gamma))
-        ))
+        _.parTraverseN(config.threads)(
+          _.update(pixel =>
+            pixel.copy(color =
+              pixel.color.correct(pixel.hits, maxHits, config.gamma)
+            )
+          )
+        )
       )
 
   private def calculateMaxHits(image: Image[F]): F[Int] =
@@ -27,10 +34,9 @@ class ImageCorrector[F[_]: Async](config: Config) {
     )
 
   def logGammaCorrect(image: Image[F]): F[Unit] =
-    for{
+    for {
       maxHits <- calculateMaxHits(image)
       _ <- correctPixels(image, maxHits)
     } yield ()
-    
-  
+
 }

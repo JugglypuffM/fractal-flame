@@ -39,7 +39,11 @@ class ImageSaver[F[_]: Async](config: Config) {
     )
 
     for {
-      _ <- image.parTraverseN(config.threads)(_.parTraverseN(config.threads)(convertPixel(_, buffer))).as(())
+      _ <- image
+        .parTraverseN(config.threads)(
+          _.parTraverseN(config.threads)(convertPixel(_, buffer))
+        )
+        .as(())
 
       _ <- Files[F].createDirectories(
         config.filePath.parent.getOrElse(Path("."))
