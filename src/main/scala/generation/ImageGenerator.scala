@@ -7,7 +7,7 @@ import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxEitherId, toFlatMapOps
 import domain.console.Config
 import domain.image.Image.*
 import domain.image.{Image, Pixel}
-import domain.transforms.Point
+import domain.transforms.{Point, Transform}
 
 class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
   private def randomBoundedPoint: F[Point] =
@@ -32,10 +32,11 @@ class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
       Async[F].unit
     } else {
       for {
-        transform <- random.elementOf(config.transforms)
-        newPoint <- transform(point)
+        affine <- random.elementOf(config.affines)
+        variation <- random.elementOf(config.variations)
+        newPoint <- Transform(affine, variation)(point)
         pixel <- projectPoint(newPoint)
-        _ <- image.updatePixel(pixel.x, pixel.y, transform.affine.color)
+        _ <- image.updatePixel(pixel.x, pixel.y, affine.color)
         _ <- processIteration(newPoint, currentIteration + 1, image)
       } yield ()
     }

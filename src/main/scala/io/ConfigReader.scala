@@ -8,7 +8,7 @@ import domain.transforms.{Affine, Transform, Variation}
 import fs2.io.file.Path
 import scopt.OParser
 
-import scala.util.Try
+import scala.util.{Random, Try}
 
 object ConfigReader {
   private val builder = OParser.builder[Config]
@@ -17,31 +17,30 @@ object ConfigReader {
 
     val processors = Runtime.getRuntime.availableProcessors()
 
-    def parseTransform(str: String): Transform =
+    def parseAffine(str: String): Affine =
       val parameterArray = str.split(",").map(_.toDouble)
-      val variation = parameterArray(9).toInt match
+
+      Affine(
+        Color(
+          parameterArray(0).toInt,
+          parameterArray(1).toInt,
+          parameterArray(2).toInt
+        ),
+        parameterArray(3),
+        parameterArray(4),
+        parameterArray(5),
+        parameterArray(6),
+        parameterArray(7),
+        parameterArray(8)
+      )
+
+    def parseVariation(number: Int): Variation =
+      number match
         case 1 => Variation.Sinusoidal
         case 2 => Variation.Spherical
         case 3 => Variation.Swirl
         case 4 => Variation.Horseshoe
         case _ => Variation.Linear
-
-      Transform(
-        Affine(
-          Color(
-            parameterArray(0).toInt,
-            parameterArray(1).toInt,
-            parameterArray(2).toInt
-          ),
-          parameterArray(3),
-          parameterArray(4),
-          parameterArray(5),
-          parameterArray(6),
-          parameterArray(7),
-          parameterArray(8)
-        ),
-        variation
-      )
 
     def validateThreads(int: Int): Either[String, Unit] =
       if ((int > 0) && (int <= processors)) success
@@ -53,10 +52,10 @@ object ConfigReader {
     def validatePath(str: String): Either[String, Unit] =
       Try(Path(str)).map(_ => success).getOrElse(failure("Invalid file path"))
 
-    def validateTransform(str: String): Either[String, Unit] =
-      Try(parseTransform(str))
+    def validateAffine(str: String): Either[String, Unit] =
+      Try(parseAffine(str))
         .map(_ => success)
-        .getOrElse(failure("Invalid transform format"))
+        .getOrElse(failure("Invalid affine transform format"))
 
     OParser.sequence(
       programName("fractal-flame"),
@@ -101,20 +100,30 @@ object ConfigReader {
         .text(
           "Parameter for log-gamma correction"
         ),
-      opt[String]("transform")
+      opt[Int]("affine-count")
+        .action((x, c) => c.copy(affineCount = x))
+        .text(
+          "Amount of affine transforms which can be applied to point during generation"
+        ),
+      opt[String]("affine")
+        .unbounded()
+        .validate(validateAffine)
+        .action((x, c) => c.copy(affines = parseAffine(x) :: c.affines))
+        .text("Array of the form r,g,b,a,b,c,d,e,f"),
+      opt[Int]("variation")
         .required()
         .unbounded()
         .action((x, c) =>
-          c.copy(transforms = parseTransform(x) :: c.transforms)
+          c.copy(variations = parseVariation(x) :: c.variations)
         )
         .text("""
-            |Array of the form r,g,b,a,b,c,d,e,f,variationNumber, where variation number =
-            |1 - Sinusoidal
-            |2 - Spherical
-            |3 - Swirl
-            |4 - Horseshoe
-            |other - Linear
-            |""".stripMargin),
+                |Variation number =
+                |1 - Sinusoidal
+                |2 - Spherical
+                |3 - Swirl
+                |4 - Horseshoe
+                |other - Linear
+                |""".stripMargin),
       opt[String]("file")
         .validate(validatePath)
         .action((x, c) => c.copy(filePath = Path(x)))
@@ -128,8 +137,14 @@ object ConfigReader {
   }
 
   def readConfig[F[_]: Applicative](args: List[String]): F[Config] =
-    OParser
+    val config = OParser
       .parse(parser, args, Config())
       .getOrElse(throw RuntimeException("Unexpected error while parsing"))
+      
+    config.copy(affines =
+        config.affines ++ List
+          .range(0, config.affineCount - config.affines.length)
+          .map(_ => Affine.generateRandomAffine)
+      )
       .pure[F]
 }
