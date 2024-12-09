@@ -6,7 +6,7 @@ import cats.effect.std.Random
 import cats.implicits.{catsSyntaxApplicativeId, toFlatMapOps, toFunctorOps}
 import domain.console.Config
 import domain.image.Image.*
-import domain.image.{Image, Pixel}
+import domain.image.{Color, Image, Pixel}
 import domain.transforms.{Point, Transform}
 
 class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
@@ -23,23 +23,42 @@ class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
       config.height - (((config.yMax - point.y) / (config.yMax - config.yMin)) * config.height).toInt - 1
     Pixel(x, y).pure[F]
 
-  def processIteration(
+  private def processRotation(
       point: Point,
-      currentIteration: Int,
+      color: Color,
+      image: Image[F]
+  ): F[Unit] =
+    def inner(rotation: Int): F[Unit] =
+      if (rotation >= config.symmetry) {
+        Async[F].unit
+      } else
+        for {
+          pixel <- projectPoint(
+            point.rotate(rotation * (2 * math.Pi / config.symmetry))
+          )
+          _ <- image.updatePixel(pixel.x, pixel.y, color)
+          _ <- inner(rotation + 1)
+        } yield ()
+
+    inner(0)
+
+  def processIteration(
+      startPoint: Point,
       image: Image[F]
   ): F[Unit] = {
-    if (currentIteration >= config.iterations) {
-      Async[F].unit
-    } else {
-      for {
-        affine <- random.elementOf(config.affines)
-        variation <- random.elementOf(config.variations)
-        newPoint <- Transform(affine, variation)(point)
-        pixel <- projectPoint(newPoint)
-        _ <- image.updatePixel(pixel.x, pixel.y, affine.color)
-        _ <- processIteration(newPoint, currentIteration + 1, image)
-      } yield ()
-    }
+    def inner(currentPoint: Point, currentIteration: Int): F[Unit] =
+      if (currentIteration >= config.iterations) {
+        Async[F].unit
+      } else
+        for {
+          affine <- random.elementOf(config.affines)
+          variation <- random.elementOf(config.variations)
+          newPoint <- Transform(affine, variation)(currentPoint)
+          _ <- processRotation(newPoint, affine.color, image)
+          _ <- inner(newPoint, currentIteration + 1)
+        } yield ()
+
+    inner(startPoint, 0)
   }
 
   def generateImage: F[Image[F]] =
@@ -51,9 +70,7 @@ class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
         .map(_ => randomBoundedPoint)
         .parTraverseN(config.threads)(identity)
       _ <- randomPoints
-        .parTraverseN(config.threads)(point =>
-          processIteration(point, 0, image)
-        )
+        .parTraverseN(config.threads)(point => processIteration(point, image))
     } yield image
 
 }

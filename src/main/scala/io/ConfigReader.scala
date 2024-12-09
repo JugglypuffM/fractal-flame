@@ -42,6 +42,10 @@ object ConfigReader {
         case 4 => Variation.Horseshoe
         case _ => Variation.Linear
 
+    def validatePositive(int: Int): Either[String, Unit] =
+      if (int > 0) success
+      else failure("Value should be positive, NO SAD VALUES ARE ALLOWED!!!")
+
     def validateThreads(int: Int): Either[String, Unit] =
       if ((int > 0) && (int <= processors)) success
       else
@@ -60,19 +64,23 @@ object ConfigReader {
     OParser.sequence(
       programName("fractal-flame"),
       opt[Int]("samples")
+        .validate(validatePositive)
         .action((x, c) => c.copy(iterations = x))
         .text("Amount of samples"),
       opt[Int]("iterations")
+        .validate(validatePositive)
         .action((x, c) => c.copy(iterations = x))
         .text("Amount of plotting iterations"),
       opt[Int]("threads")
         .validate(validateThreads)
         .action((x, c) => c.copy(threads = x))
-        .text(""),
+        .text("Amount of threads to process the image"),
       opt[Int]("width")
+        .validate(validatePositive)
         .action((x, c) => c.copy(width = x))
         .text("Width of resulting image"),
       opt[Int]("height")
+        .validate(validatePositive)
         .action((x, c) => c.copy(height = x))
         .text("Height of resulting image"),
       opt[Double]("xMin")
@@ -101,6 +109,7 @@ object ConfigReader {
           "Parameter for log-gamma correction"
         ),
       opt[Int]("affine-count")
+        .validate(validatePositive)
         .action((x, c) => c.copy(affineCount = x))
         .text(
           "Amount of affine transforms which can be applied to point during generation"
@@ -124,6 +133,10 @@ object ConfigReader {
                 |4 - Horseshoe
                 |other - Linear
                 |""".stripMargin),
+      opt[Int]("symmetry")
+        .validate(validatePositive)
+        .action((x, c) => c.copy(symmetry = x))
+        .text("Symmetry parameter"),
       opt[String]("file")
         .validate(validatePath)
         .action((x, c) => c.copy(filePath = Path(x)))
@@ -140,8 +153,9 @@ object ConfigReader {
     val config = OParser
       .parse(parser, args, Config())
       .getOrElse(throw RuntimeException("Unexpected error while parsing"))
-      
-    config.copy(affines =
+
+    config
+      .copy(affines =
         config.affines ++ List
           .range(0, config.affineCount - config.affines.length)
           .map(_ => Affine.generateRandomAffine)
