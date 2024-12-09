@@ -2,7 +2,7 @@ package domain.image
 
 import cats.Applicative
 import cats.effect.{Async, Ref}
-import cats.syntax.all.{catsSyntaxApplicativeId, toTraverseOps}
+import cats.syntax.all.toTraverseOps
 
 object Image {
   type Image[F[_]] = Vector[Vector[Ref[F, Pixel]]]

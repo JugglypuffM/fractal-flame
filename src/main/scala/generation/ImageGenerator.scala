@@ -3,7 +3,7 @@ package generation
 import cats.effect.Async
 import cats.effect.implicits.concurrentParTraverseOps
 import cats.effect.std.Random
-import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxEitherId, toFlatMapOps, toFunctorOps}
+import cats.implicits.{catsSyntaxApplicativeId, toFlatMapOps, toFunctorOps}
 import domain.console.Config
 import domain.image.Image.*
 import domain.image.{Image, Pixel}
@@ -50,9 +50,10 @@ class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
         .range(0, config.samples)
         .map(_ => randomBoundedPoint)
         .parTraverseN(config.threads)(identity)
-      _ <- randomPoints.parTraverseN(config.threads)(point =>
-        processIteration(point, 0, image)
-      )
+      _ <- randomPoints
+        .parTraverseN(config.threads)(point =>
+          processIteration(point, 0, image)
+        )
     } yield image
 
 }
