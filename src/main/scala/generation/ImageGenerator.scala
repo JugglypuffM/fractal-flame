@@ -3,7 +3,7 @@ package generation
 import cats.effect.Async
 import cats.effect.implicits.concurrentParTraverseOps
 import cats.effect.std.Random
-import cats.implicits.{catsSyntaxApplicativeId, toFlatMapOps, toFunctorOps}
+import cats.implicits.{catsSyntaxApplicativeId, toFlatMapOps, toFunctorOps, toTraverseOps}
 import domain.console.Config
 import domain.image.Image.*
 import domain.image.{Color, Image, Pixel}
@@ -18,15 +18,15 @@ class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
 
   private def projectPoint(point: Point): F[Pixel] =
     val x =
-      config.width - (((config.xMax - point.x) / (config.xMax - config.xMin)) * config.width).toInt - 1
+      config.renderWidth - (((config.xMax - point.x) / (config.xMax - config.xMin)) * config.renderWidth).toInt - 1
     val y =
-      config.height - (((config.yMax - point.y) / (config.yMax - config.yMin)) * config.height).toInt - 1
+      config.renderHeight - (((config.yMax - point.y) / (config.yMax - config.yMin)) * config.renderHeight).toInt - 1
     Pixel(x, y).pure[F]
 
   private def processRotation(
       point: Point,
       color: Color,
-      image: Image[F]
+      image: ImageRefs[F]
   ): F[Unit] =
     def inner(rotation: Int): F[Unit] =
       if (rotation >= config.symmetry) {
@@ -44,7 +44,7 @@ class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
 
   def processIteration(
       startPoint: Point,
-      image: Image[F]
+      image: ImageRefs[F]
   ): F[Unit] = {
     def inner(currentPoint: Point, currentIteration: Int): F[Unit] =
       if (currentIteration >= config.iterations) {
@@ -61,14 +61,15 @@ class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
     inner(startPoint, 0)
   }
 
-  def generateImage: F[Image[F]] =
+  def generateImage: F[ImageRefs[F]] =
     for {
-      image <- Image.empty(config.width, config.height)
+      image <- Image.empty(config.renderWidth, config.renderHeight)
 
       randomPoints <- List
         .range(0, config.samples)
         .map(_ => randomBoundedPoint)
-        .parTraverseN(config.threads)(identity)
+        .traverse(identity)
+      
       _ <- randomPoints
         .parTraverseN(config.threads)(point => processIteration(point, image))
     } yield image

@@ -1,18 +1,20 @@
 package domain.image
 
 import cats.Applicative
+import cats.effect.implicits.concurrentParTraverseOps
 import cats.effect.{Async, Ref}
 import cats.syntax.all.toTraverseOps
 
 object Image {
-  type Image[F[_]] = Vector[Vector[Ref[F, Pixel]]]
+  type ImageRefs[F[_]] = Vector[Vector[Ref[F, Pixel]]]
+  type Image = Vector[Vector[Pixel]]
 
-  def empty[F[_]: Async](width: Int, height: Int): F[Image[F]] =
+  def empty[F[_]: Async](width: Int, height: Int): F[ImageRefs[F]] =
     Vector
       .tabulate(height, width)((i, j) => Ref.of[F, Pixel](Pixel(j, i)))
       .traverse(_.sequence)
 
-  implicit class ImageOps[F[_]](val grid: Image[F]) extends AnyVal {
+  implicit class ImageOps[F[_]](val grid: ImageRefs[F]) extends AnyVal {
     def updatePixel(x: Int, y: Int, color: Color)(implicit
         F: Applicative[F]
     ): F[Unit] = {
@@ -31,5 +33,8 @@ object Image {
           }
         }
     }
+
+    def get(implicit F: Async[F]): F[Image] =
+      grid.traverse(_.traverse(_.get))
   }
 }

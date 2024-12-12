@@ -1,7 +1,6 @@
 package io
 
-import cats.effect.{Async, Ref}
-import cats.effect.implicits.concurrentParTraverseOps
+import cats.effect.Async
 import cats.implicits.{toFlatMapOps, toFunctorOps}
 import domain.console.Config
 import domain.image.Image.Image
@@ -15,15 +14,13 @@ import javax.imageio.ImageIO
 
 class ImageSaver[F[_]: Async](config: Config) {
   private def convertPixel(
-      pixelRef: Ref[F, Pixel],
+      pixel: Pixel,
       buffer: BufferedImage
-  ): F[Unit] =
-    pixelRef.get.map(pixel =>
-      buffer.setRGB(
-        pixel.x,
-        pixel.y,
-        (pixel.color.red << 16) | (pixel.color.green << 8) | pixel.color.blue
-      )
+  ): Unit =
+    buffer.setRGB(
+      pixel.x,
+      pixel.y,
+      (pixel.color.red << 16) | (pixel.color.green << 8) | pixel.color.blue
     )
 
   private def bufferToStream(buffer: BufferedImage): Stream[F, Byte] =
@@ -31,20 +28,16 @@ class ImageSaver[F[_]: Async](config: Config) {
     ImageIO.write(buffer, "png", outputStream)
     Stream.emits(outputStream.toByteArray)
 
-  def saveImage(image: Image[F]): F[Unit] =
+  def saveImage(image: Image): F[Unit] =
     val buffer = new BufferedImage(
-      config.width,
-      config.height,
+      config.resultWidth,
+      config.resultHeight,
       BufferedImage.TYPE_INT_RGB
     )
 
-    for {
-      _ <- image
-        .parTraverseN(config.threads)(
-          _.parTraverseN(config.threads)(convertPixel(_, buffer))
-        )
-        .as(())
+    image.map(_.map(convertPixel(_, buffer)))
 
+    for {
       _ <- Files[F].createDirectories(
         config.filePath.parent.getOrElse(Path("."))
       )

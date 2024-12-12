@@ -4,11 +4,11 @@ import cats.Applicative
 import cats.implicits.*
 import domain.console.Config
 import domain.image.Color
-import domain.transforms.{Affine, Transform, Variation}
+import domain.transforms.{Affine, Variation}
 import fs2.io.file.Path
 import scopt.OParser
 
-import scala.util.{Random, Try}
+import scala.util.Try
 
 object ConfigReader {
   private val builder = OParser.builder[Config]
@@ -77,12 +77,18 @@ object ConfigReader {
         .text("Amount of threads to process the image"),
       opt[Int]("width")
         .validate(validatePositive)
-        .action((x, c) => c.copy(width = x))
+        .action((x, c) => c.copy(resultWidth = x))
         .text("Width of resulting image"),
       opt[Int]("height")
         .validate(validatePositive)
-        .action((x, c) => c.copy(height = x))
+        .action((x, c) => c.copy(resultHeight = x))
         .text("Height of resulting image"),
+      opt[Int]("sampling-factor")
+        .validate(validatePositive)
+        .action((x, c) => c.copy(samplingFactor = x))
+        .text(
+          "Multiplier for rendering resolution - after rendering image will be downscaled"
+        ),
       opt[Double]("xMin")
         .action((x, c) => c.copy(xMin = x))
         .text(
@@ -155,10 +161,12 @@ object ConfigReader {
       .getOrElse(throw RuntimeException("Unexpected error while parsing"))
 
     config
-      .copy(affines =
-        config.affines ++ List
+      .copy(
+        affines = config.affines ++ List
           .range(0, config.affineCount - config.affines.length)
-          .map(_ => Affine.generateRandomAffine)
+          .map(_ => Affine.generateRandomAffine),
+        renderWidth = config.resultWidth * config.samplingFactor,
+        renderHeight = config.resultHeight * config.samplingFactor
       )
       .pure[F]
 }
