@@ -5,11 +5,11 @@ import cats.effect.implicits.concurrentParTraverseOps
 import cats.effect.std.Random
 import cats.implicits.{catsSyntaxApplicativeId, toFlatMapOps, toFunctorOps}
 import domain.console.Config
-import domain.image.Image.*
-import domain.image.{Color, Image, Pixel}
+import domain.image.{Color, Pixel}
+import domain.repository.ImageRepository
 import domain.transforms.{Point, Transform}
 
-class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
+class ImageGenerator[F[_]: Async](image: ImageRepository[F], config: Config, random: Random[F]) {
   private def randomBoundedPoint: F[Point] =
     for {
       x <- random.betweenDouble(config.xMin, config.xMax)
@@ -26,7 +26,6 @@ class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
   private def processRotation(
       point: Point,
       color: Color,
-      image: Image[F]
   ): F[Unit] =
     def inner(rotation: Int): F[Unit] =
       if (rotation >= config.symmetry) {
@@ -44,7 +43,6 @@ class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
 
   def processIteration(
       startPoint: Point,
-      image: Image[F]
   ): F[Unit] = {
     def inner(currentPoint: Point, currentIteration: Int): F[Unit] =
       if (currentIteration >= config.iterations) {
@@ -54,23 +52,21 @@ class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
           affine <- random.elementOf(config.affines)
           variation <- random.elementOf(config.variations)
           newPoint <- Transform(affine, variation)(currentPoint)
-          _ <- processRotation(newPoint, affine.color, image)
+          _ <- processRotation(newPoint, affine.color)
           _ <- inner(newPoint, currentIteration + 1)
         } yield ()
 
     inner(startPoint, 0)
   }
 
-  def generateImage: F[Image[F]] =
+  def generateImage: F[Unit] =
     for {
-      image <- Image.empty(config.width, config.height)
-
       randomPoints <- List
         .range(0, config.samples)
         .map(_ => randomBoundedPoint)
         .parTraverseN(config.threads)(identity)
       _ <- randomPoints
-        .parTraverseN(config.threads)(point => processIteration(point, image))
-    } yield image
+        .parTraverseN(config.threads)(point => processIteration(point))
+    } yield ()
 
 }
