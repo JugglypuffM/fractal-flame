@@ -45,9 +45,9 @@ class ImageCorrector[F[_]: Async](config: Config) {
       val newY = pixel.y / config.samplingFactor
       val (redSum, greenSum, blueSum) = sumColorsForUpperLeft(pixel)
       val newColor = Color(
-        redSum / config.samplingFactor,
-        greenSum / config.samplingFactor,
-        blueSum / config.samplingFactor
+        redSum / (config.samplingFactor * config.samplingFactor),
+        greenSum / (config.samplingFactor * config.samplingFactor),
+        blueSum / (config.samplingFactor * config.samplingFactor)
       )
       pixel.copy(x = newX, y = newY, color = newColor)
 
