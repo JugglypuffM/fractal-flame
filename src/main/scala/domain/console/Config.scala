@@ -18,6 +18,7 @@ case class Config(
     yMax: Double = 1,
     gamma: Double = 2.2,
     affineCount: Int = 10,
+    variationCount: Int = 3,
     affines: List[Affine] = List.empty,
     variations: List[Variation] = List.empty,
     symmetry: Int = 1,

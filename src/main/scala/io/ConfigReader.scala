@@ -8,7 +8,7 @@ import domain.transforms.{Affine, Variation}
 import fs2.io.file.Path
 import scopt.OParser
 
-import scala.util.Try
+import scala.util.{Random, Try}
 
 object ConfigReader {
   private val builder = OParser.builder[Config]
@@ -16,31 +16,6 @@ object ConfigReader {
     import builder.*
 
     val processors = Runtime.getRuntime.availableProcessors()
-
-    def parseAffine(str: String): Affine =
-      val parameterArray = str.split(",").map(_.toDouble)
-
-      Affine(
-        Color(
-          parameterArray(0).toInt,
-          parameterArray(1).toInt,
-          parameterArray(2).toInt
-        ),
-        parameterArray(3),
-        parameterArray(4),
-        parameterArray(5),
-        parameterArray(6),
-        parameterArray(7),
-        parameterArray(8)
-      )
-
-    def parseVariation(number: Int): Variation =
-      number match
-        case 1 => Variation.Sinusoidal
-        case 2 => Variation.Spherical
-        case 3 => Variation.Swirl
-        case 4 => Variation.Horseshoe
-        case _ => Variation.Linear
 
     def validatePositive(int: Int): Either[String, Unit] =
       if (int > 0) success
@@ -120,13 +95,18 @@ object ConfigReader {
         .text(
           "Amount of affine transforms which can be applied to point during generation"
         ),
+      opt[Int]("variation-count")
+        .validate(validatePositive)
+        .action((x, c) => c.copy(variationCount = x))
+        .text(
+          "Amount of affine transforms which can be applied to point during generation"
+        ),
       opt[String]("affine")
         .unbounded()
         .validate(validateAffine)
         .action((x, c) => c.copy(affines = parseAffine(x) :: c.affines))
         .text("Array of the form r,g,b,a,b,c,d,e,f"),
       opt[Int]("variation")
-        .required()
         .unbounded()
         .action((x, c) =>
           c.copy(variations = parseVariation(x) :: c.variations)
@@ -137,6 +117,18 @@ object ConfigReader {
                 |2 - Spherical
                 |3 - Swirl
                 |4 - Horseshoe
+                |5 - Polar
+                |6 - Spiral
+                |7 - Handkerchief
+                |8 - Heart
+                |9 - Disc
+                |10 - Diamond
+                |11 - Ex
+                |12 - Julia
+                |13 - Waves
+                |14 - Fisheye
+                |15 - Bubble
+                |16 - Exponential
                 |other - Linear
                 |""".stripMargin),
       opt[Int]("symmetry")
@@ -155,6 +147,43 @@ object ConfigReader {
     )
   }
 
+  private def parseAffine(str: String): Affine =
+    val parameterArray = str.split(",").map(_.toDouble)
+
+    Affine(
+      Color(
+        parameterArray(0).toInt,
+        parameterArray(1).toInt,
+        parameterArray(2).toInt
+      ),
+      parameterArray(3),
+      parameterArray(4),
+      parameterArray(5),
+      parameterArray(6),
+      parameterArray(7),
+      parameterArray(8)
+    )
+
+  private def parseVariation(number: Int): Variation =
+    number match
+      case 1  => Variation.Sinusoidal
+      case 2  => Variation.Spherical
+      case 3  => Variation.Swirl
+      case 4  => Variation.Horseshoe
+      case 5  => Variation.Polar
+      case 6  => Variation.Spiral
+      case 7  => Variation.Handkerchief
+      case 8  => Variation.Heart
+      case 9  => Variation.Disc
+      case 10 => Variation.Diamond
+      case 11 => Variation.Ex
+      case 12 => Variation.Julia
+      case 13 => Variation.Waves
+      case 14 => Variation.Fisheye
+      case 15 => Variation.Bubble
+      case 16 => Variation.Exponential
+      case _  => Variation.Linear
+
   def readConfig[F[_]: Applicative](args: List[String]): F[Config] =
     val config = OParser
       .parse(parser, args, Config())
@@ -165,6 +194,11 @@ object ConfigReader {
         affines = config.affines ++ List
           .range(0, config.affineCount - config.affines.length)
           .map(_ => Affine.generateRandomAffine),
+        variations = config.variations ++ List
+          .range(0, config.variationCount - config.variations.length)
+          .map(_ =>
+            parseVariation(Random.nextInt(Variation.variationAmount - 1))
+          ),
         renderWidth = config.resultWidth * config.samplingFactor,
         renderHeight = config.resultHeight * config.samplingFactor
       )
