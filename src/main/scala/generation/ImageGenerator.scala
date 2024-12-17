@@ -2,7 +2,6 @@ package generation
 
 import cats.effect.Async
 import cats.effect.implicits.concurrentParTraverseOps
-import cats.effect.std.Random
 import cats.implicits.{
   catsSyntaxApplicativeId,
   toFlatMapOps,
@@ -14,21 +13,21 @@ import domain.image.Image.*
 import domain.image.{Color, Image, Pixel}
 import domain.transforms.{Point, Transform}
 
-class ImageGenerator[F[_]: Async](config: Config, random: Random[F]) {
-  private def randomBoundedPoint: F[Point] =
+class ImageGenerator[F[_]: Async](config: Config, random: MyRandom[F]) {
+  def randomBoundedPoint: F[Point] =
     for {
       x <- random.betweenDouble(config.xMin, config.xMax)
       y <- random.betweenDouble(config.yMin, config.yMax)
     } yield Point(x, y)
 
-  private def projectPoint(point: Point): F[Pixel] =
+  def projectPoint(point: Point): F[Pixel] =
     val x =
       config.renderWidth - (((config.xMax - point.x) / (config.xMax - config.xMin)) * config.renderWidth).toInt - 1
     val y =
       config.renderHeight - (((config.yMax - point.y) / (config.yMax - config.yMin)) * config.renderHeight).toInt - 1
     Pixel(x, y).pure[F]
 
-  private def processRotation(
+  def processRotation(
       point: Point,
       color: Color,
       image: ImageRefs[F]
