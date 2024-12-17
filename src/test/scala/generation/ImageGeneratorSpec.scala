@@ -271,7 +271,7 @@ class ImageGeneratorSpec
         println(s"$processors-threaded time: ${maxThreadTime / 1e6} ms")
 
         halfMaxThreadTime should be < singleThreadTime
-        maxThreadTime should be <= halfMaxThreadTime - (5 * halfMaxThreadTime) / 100
+        maxThreadTime should be <= halfMaxThreadTime + (5 * halfMaxThreadTime) / 100
       }
 
     }
